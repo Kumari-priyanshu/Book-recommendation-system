@@ -1,194 +1,261 @@
-# 📚 BookVerse – Discover Your Next Favourite Read
+# 📖 Shelfwise: Book Recommendations Without the Slop
 
-**A personalized book recommendation platform powered by Machine Learning.**
+**A book recommender that explains itself, resists popularity bias, and filters out low-effort filler.**
 
-BookVerse aims to make discovering your next favourite book easier. Instead of endlessly scrolling through book lists, users can rate books they've already read, explore new titles, and receive personalized recommendations based on their reading preferences.
+Most "you might like" feeds push whatever is trending, whatever is cheap to produce, or whatever keeps you scrolling. Shelfwise takes the opposite approach: tell it what you've actually read and loved, and it recommends books you'd probably never have found on a bestseller list, and tells you *why* each one showed up.
 
-The idea is simple: **Tell us what you love reading, and let the recommendation engine do the magic!** ✨
+> **Status:** 🚧 Planning / early development. Everything below is the design and roadmap. Checkboxes show what's done.
 
 ---
 
-## 🎯 Project Objectives
+## 🧹 What "Slop" Means Here
 
-The goal is to build a personalized book recommendation system that:
+| The Problem | How Shelfwise Pushes Back |
+|---|---|
+| Popularity bias: the same 50 bestsellers everywhere | Popularity-debiased ranking and a long-tail exposure metric |
+| Black-box suggestions ("because you watched...") | Every recommendation ships with a plain-language explanation |
+| Low-quality or mass-produced titles padding the catalog | Quality filters based on rating count, rating variance, and metadata completeness |
+| Filter bubbles | Tunable "discovery" slider that trades relevance for novelty |
+| Engagement bait | No infinite scroll, no streaks; a short, finite list per session |
 
-- Allows users to explore and rate books.
-- Recommends books based on individual reading preferences.
-- Identifies similarities between books using machine learning.
-- Discovers hidden reading patterns from user ratings.
-- Provides an interactive platform for book lovers.
+---
+
+## 🎯 Project Goals
+
+- Let users rate books and build a personal shelf.
+- Recommend books using collaborative, content-based, and hybrid models.
+- Explain each recommendation (similar readers, shared themes, same author, and so on).
+- Measure success beyond accuracy: **diversity, novelty, coverage, and popularity bias**.
+- Offer a "discovery" control so users decide how adventurous the results are.
+
+---
 
 ## 📊 Dataset
 
-We plan to use the [Goodbooks-10k Dataset](https://github.com/zygmuntz/goodbooks-10k).
+[**Goodbooks-10k**](https://github.com/zygmuntz/goodbooks-10k)
 
-The dataset contains approximately:
-- 10,000 books.
-- 6 million ratings.
-- 53,000 users.
-- Book metadata, tags, and reading preferences.
-
-### Dataset Structure
+- ~10,000 books
+- ~6 million ratings
+- ~53,000 users
+- Tags, metadata, and a to-read list
 
 ```text
-GoodBooks-10k/
-│
-├── books.csv          # Book information and metadata
-├── ratings.csv        # User-book ratings
-├── book_tags.csv      # Tags associated with books
-├── tags.csv           # Tag names and identifiers
-└── to_read.csv        # Books users want to read
+goodbooks-10k/
+├── books.csv        # Metadata (title, authors, year, ratings stats, image URLs)
+├── ratings.csv      # user_id, book_id, rating (1-5)
+├── book_tags.csv    # Tag assignments per book
+├── tags.csv         # Tag id → name
+└── to_read.csv      # Books users saved to read later
 ```
 
-## 🛠️ Data Preprocessing
+**Planned preprocessing**
 
-Before training the recommendation models, the dataset will undergo cleaning and preprocessing.
+- Remove duplicate ratings and duplicate editions of the same book
+- Validate `book_id` / `goodreads_book_id` mappings across files
+- Handle missing titles, years, and image URLs
+- Clean noisy tags (e.g. `to-read`, `favorites`) that carry no content signal
+- Filter users/books with too few ratings
+- Build the sparse user-item matrix and a train/validation/test split by time or per-user holdout
 
-Planned operations:
-
-- Handling missing values.
-- Removing duplicate books and ratings.
-- Validating book IDs across datasets.
-- Handling missing book image URLs.
-- Preparing user-item interaction matrices.
-- Processing book titles, authors, and tags.
-- Filtering users and books with insufficient ratings where necessary.
+---
 
 ## 🧠 Recommendation Engine
 
-The project will explore multiple recommendation approaches.
+### 1. Collaborative Filtering (baseline)
+Item-based and user-based kNN on the rating matrix. Simple, interpretable, and the benchmark everything else must beat.
 
-### 1. Collaborative Filtering
-
-Recommends books based on user preferences and rating patterns.
-
-The system identifies users with similar reading interests and recommends books that similar users enjoyed.
-
-### 2. Matrix Factorization (FunkSVD)
-
-Uses latent user and book representations to discover hidden relationships in rating data.
-
-The model learns embeddings for users and books and predicts how a user might rate an unseen book.
+### 2. Matrix Factorization
+SVD / FunkSVD-style latent factors (via Surprise), plus an implicit-feedback model such as ALS for the `to_read` signal.
 
 ### 3. Content-Based Filtering
+Two representations are compared:
 
-Recommends books based on their attributes, such as:
+- **TF-IDF** over titles, authors, and cleaned tags (classic baseline)
+- **Sentence embeddings** over book descriptions/tags for semantic similarity ("quiet, character-driven sci-fi" matching beyond keywords)
 
-- Book titles
-- Authors
-- Genres
-- Tags
+### 4. Hybrid Ranker
+A weighted blend of collaborative and content scores, followed by a **re-ranking step** that:
 
-Techniques such as TF-IDF and cosine similarity will help identify books with similar characteristics.
+1. Penalizes over-popular items (popularity debiasing)
+2. Applies a diversity pass (MMR-style) so the top-N isn't ten near-duplicates
+3. Applies the user's **discovery slider** value
 
-### 4. Hybrid Recommendation System
+### 5. Explanations
+Each result carries a reason generated from the model signals, for example:
 
-The long-term goal is to combine collaborative and content-based filtering to create a hybrid recommendation engine that provides more relevant and diverse recommendations.
+- *"Readers who rated *X* and *Y* highly also loved this."*
+- *"Shares the tags `slow-burn`, `dystopian` with *Z*, which you rated 5★."*
+- *"Same author as a book on your shelf."*
+
+---
+
+## 🔍 Quality Filtering
+
+Before a book becomes recommendable, it passes through lightweight checks:
+
+- Minimum number of ratings (avoids unreliable averages)
+- Rating-distribution sanity check (suspiciously uniform ratings are flagged)
+- Metadata completeness (title, author, year, cover)
+- Optional user toggle: *"Only show books with 500+ ratings"* vs. *"Surface hidden gems"*
+
+---
 
 ## 🚀 Planned Features
 
-- [ ] User registration and authentication.
-- [ ] Browse and search books.
-- [ ] Rate and review books.
-- [ ] Personalized book recommendations.
-- [ ] Similar-book discovery.
-- [ ] Genre-based recommendations.
-- [ ] Popular and trending books.
-- [ ] Personal reading list.
-- [ ] Book details and cover images.
-- [ ] Responsive user interface.
+- [ ] Sign up / log in
+- [ ] Search and browse books
+- [ ] Rate and review books
+- [ ] Personal shelf: read, reading, want-to-read
+- [ ] Personalized recommendations with explanations
+- [ ] "More like this" for any book
+- [ ] Discovery slider (familiar ↔ adventurous)
+- [ ] Genre/tag filters
+- [ ] Hidden gems view (high rating, low popularity)
+- [ ] Cold-start onboarding: rate 5-10 books to get started
+- [ ] Responsive UI
 
-## 🏗️ Proposed Technology Stack
+---
 
-| Component | Technology |
+## 🏗️ Tech Stack
+
+| Layer | Choice |
 |---|---|
-| Frontend | React.js |
-| Backend | Python / Django REST Framework |
-| Machine Learning | Python, Scikit-learn |
-| Data Processing | Pandas, NumPy |
-| Recommendation Models | Surprise, Scikit-learn |
-| Database | MongoDB / PostgreSQL |
-| Visualization | Matplotlib, Seaborn |
-| Version Control | Git & GitHub |
+| Frontend | React (Vite) + Tailwind CSS |
+| Backend API | FastAPI (Python) |
+| ML / Data | Pandas, NumPy, Scikit-learn, Surprise, `implicit` |
+| Embeddings | `sentence-transformers` |
+| Database | PostgreSQL |
+| Experiments | Jupyter, Matplotlib, Seaborn |
+| Tooling | Git, GitHub Actions, pytest |
 
-*The technology stack may evolve as development progresses.*
+*Stack may change as the project evolves.*
 
-## 📁 Proposed Project Structure
+---
+
+## 📁 Project Structure
 
 ```text
-BookVerse/
-│
+shelfwise/
 ├── frontend/
-│   ├── src/
-│   ├── components/
-│   ├── pages/
-│   └── assets/
+│   └── src/
+│       ├── components/
+│       ├── pages/
+│       └── api/
 │
 ├── backend/
-│   ├── api/
-│   ├── models/
-│   ├── serializers/
-│   └── views/
+│   ├── app/
+│   │   ├── routes/
+│   │   ├── schemas/
+│   │   ├── services/       # recommendation service layer
+│   │   └── db/
+│   └── tests/
 │
-├── recommendation_engine/
+├── engine/
 │   ├── preprocessing/
-│   ├── collaborative_filtering/
+│   ├── collaborative/
 │   ├── content_based/
-│   ├── hybrid_model/
-│   └── saved_models/
+│   ├── hybrid/
+│   ├── rerank/             # popularity debiasing + diversity
+│   ├── explain/
+│   └── evaluation/
 │
-├── dataset/
-│   ├── books.csv
-│   ├── ratings.csv
-│   └── book_tags.csv
+├── data/
+│   ├── raw/
+│   └── processed/
 │
 ├── notebooks/
-│   ├── data_exploration.ipynb
-│   ├── preprocessing.ipynb
-│   ├── collaborative_filtering.ipynb
-│   └── recommendation_model.ipynb
+│   ├── 01_eda.ipynb
+│   ├── 02_preprocessing.ipynb
+│   ├── 03_collaborative.ipynb
+│   ├── 04_content_based.ipynb
+│   └── 05_hybrid_and_eval.ipynb
 │
-├── README.md
-└── requirements.txt
+├── requirements.txt
+└── README.md
 ```
 
-## 📈 Model Evaluation
+---
 
-We intend to evaluate the recommendation models using appropriate metrics, including:
+## 📈 Evaluation
 
-- RMSE (Root Mean Squared Error).
-- MAE (Mean Absolute Error).
-- Precision@K.
-- Recall@K.
-- Recommendation diversity.
+Accuracy alone rewards recommending bestsellers, so Shelfwise tracks both.
 
-The objective is not just to predict ratings accurately but also to recommend books that users genuinely find interesting.
+**Accuracy**
+- RMSE, MAE (rating prediction)
+- Precision@K, Recall@K, NDCG@K (ranking)
 
-## 🗺️ Development Roadmap
+**Anti-slop metrics**
+- **Coverage:** fraction of the catalog that ever gets recommended
+- **Novelty / long-tail share:** how many recommendations come from outside the top-popularity tier
+- **Intra-list diversity:** average dissimilarity within a recommendation list
+- **Popularity bias:** correlation between item popularity and recommendation frequency
 
-- [ ] Phase 1: Dataset collection and exploration.
-- [ ] Phase 2: Data cleaning and preprocessing.
-- [ ] Phase 3: Build collaborative filtering model.
-- [ ] Phase 4: Build content-based recommendation model.
-- [ ] Phase 5: Experiment with hybrid recommendations.
-- [ ] Phase 6: Develop backend APIs.
-- [ ] Phase 7: Build the frontend interface.
-- [ ] Phase 8: Integrate recommendation engine.
-- [ ] Phase 9: Testing, evaluation and deployment.
+The target is a model that stays competitive on accuracy while clearly beating the baseline on coverage and novelty.
+
+---
+
+## 🗺️ Roadmap
+
+- [ ] **Phase 1:** Data exploration
+- [ ] **Phase 2:** Cleaning and preprocessing
+- [ ] **Phase 3:** Collaborative filtering and matrix factorization baselines
+- [ ] **Phase 4:** Content-based models (TF-IDF vs. embeddings)
+- [ ] **Phase 5:** Hybrid ranker + debiasing/diversity re-ranking
+- [ ] **Phase 6:** Explanation generator
+- [ ] **Phase 7:** Evaluation report (accuracy + anti-slop metrics)
+- [ ] **Phase 8:** Backend API
+- [ ] **Phase 9:** Frontend
+- [ ] **Phase 10:** Integration, testing, deployment
+
+---
+
+## ⚙️ Getting Started
+
+```bash
+# 1. Clone
+git clone https://github.com/<your-username>/shelfwise.git
+cd shelfwise
+
+# 2. Create environment
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+
+# 3. Download the dataset into data/raw/
+#    https://github.com/zygmuntz/goodbooks-10k
+
+# 4. Explore
+jupyter notebook notebooks/01_eda.ipynb
+```
+
+---
+
+## 🤝 Contributing
+
+Ideas, issues, and PRs are welcome, especially around better quality signals, evaluation metrics, and explanation wording.
+
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feature/your-idea`)
+3. Commit your changes
+4. Open a pull request
+
+---
 
 ## 📚 References
 
 - [Goodbooks-10k Dataset](https://github.com/zygmuntz/goodbooks-10k)
-- [Surprise – Recommendation System Library](https://surpriselib.com/)
+- [Surprise: Recommender System Library](https://surpriselib.com/)
+- [implicit: Fast Collaborative Filtering for Implicit Feedback](https://github.com/benfred/implicit)
 - [Scikit-learn Documentation](https://scikit-learn.org/)
-- [Matrix Factorization – FunkSVD](https://sifter.org/~simon/journal/20061211.html)
-
-## 💡 Vision
-
-BookVerse is an exploration of how machine learning can make everyday experiences more personal.
-
-Because sometimes, finding your next favourite book shouldn't be harder than reading it. ❤️
+- [Sentence-Transformers](https://www.sbert.net/)
+- [FunkSVD](https://sifter.org/~simon/journal/20061211.html)
 
 ---
 
-*Built with curiosity, experimentation, and a love for books.*
+## 📄 License
+
+MIT. See `LICENSE` for details.
+
+---
+
+*Built for people who'd rather read than scroll.*
